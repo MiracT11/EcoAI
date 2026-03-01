@@ -72,7 +72,7 @@ def predict(data: GameData):
 
     ecoscore = max(0, min(100, round(prediction)))
 
-    if ecoscore > 75:
+    if ecoscore > 60:
         difficulty = "increase"
     elif ecoscore > 40:
         difficulty = "stable"
