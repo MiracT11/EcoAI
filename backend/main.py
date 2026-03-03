@@ -1,13 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
 import pandas as pd
 import os
-import pickle
 
 app = FastAPI()
 
-DATA_PATH = "data/collected_data.csv"
-MODEL_PATH = "models/model.pkl"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(BASE_DIR, "data", "collected_data.csv")
 
 # ==============================
 # Veri Modeli
@@ -17,25 +16,6 @@ class GameData(BaseModel):
     wrong: int
     avg_time: float
     hint_used: int
-
-# ==============================
-# Model Global Değişken
-# ==============================
-
-model = None
-
-# ==============================
-# Startup Event – Modeli Yükle
-# ==============================
-@app.on_event("startup")
-def load_model():
-    global model
-    if os.path.exists(MODEL_PATH):
-        with open(MODEL_PATH, "rb") as f:
-            model = pickle.load(f)
-        print("✅ Model loaded successfully!")
-    else:
-        print("⚠️ Model file not found. Train the model first.")
 
 # ==============================
 # Veri Toplama Endpoint
@@ -52,29 +32,25 @@ def collect_data(data: GameData):
     return {"message": "Data saved successfully"}
 
 # ==============================
-# Tahmin Endpoint
+# EcoScore Hesaplama Endpoint
 # ==============================
 @app.post("/predict")
 def predict(data: GameData):
-    global model
 
-    if model is None:
-        raise HTTPException(status_code=500, detail="Model not loaded")
+    # Matematiksel skor hesaplama
+    raw_score = (
+        (data.correct * 5)
+        - (data.wrong * 3)
+        - (data.hint_used * 2)
+        - (data.avg_time * 2)
+    )
 
-    input_df = pd.DataFrame([{
-        "correct": data.correct,
-        "wrong": data.wrong,
-        "avg_time": data.avg_time,
-        "hint_used": data.hint_used
-    }])
+    ecoscore = max(0, min(100, round(raw_score)))
 
-    prediction = model.predict(input_df)[0]
-
-    ecoscore = max(0, min(100, round(prediction)))
-
-    if ecoscore > 60:
+    # Zorluk kararı
+    if ecoscore > 70:
         difficulty = "increase"
-    elif ecoscore > 40:
+    elif ecoscore > 45:
         difficulty = "stable"
     else:
         difficulty = "decrease"
